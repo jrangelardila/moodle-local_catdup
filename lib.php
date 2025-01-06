@@ -24,30 +24,34 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-function local_catdup_extend_settings_navigation($navigation, $context) {
+function local_catdup_extend_settings_navigation($navigation, $context)
+{
     if (is_siteadmin()) {
         $navigation->add(get_string('pluginname', 'local_catdup'), new moodle_url('/local/catdup/'));
     }
 }
 
-function local_catdup_get_courses($catid) {
+function local_catdup_get_courses($catid)
+{
     global $DB;
-    $courses = $DB->get_records('course', [ 'category' => $catid ]);
+    $courses = $DB->get_records('course', ['category' => $catid]);
     return $courses;
 }
 
-function local_catdup_get_categories($catid) {
+function local_catdup_get_categories($catid)
+{
     global $DB;
-    $categories = $DB->get_records('course_categories', [ 'parent' => $catid ]);
+    $categories = $DB->get_records('course_categories', ['parent' => $catid]);
     return $categories;
 }
 
-function local_catdup_duplicate($origin, $destination, $USER, $extension, $oldextension) {
+function local_catdup_duplicate($origin, $destination, $USER, $extension, $oldextension)
+{
     global $CFG, $DB;
-    require_once( __DIR__ . '/../../course/externallib.php');
+    require_once(__DIR__ . '/../../course/externallib.php');
     //for higher version
     //require_once( __DIR__ . '/../../lib/coursecatlib.php');
-    require_once( __DIR__ . '/../../course/classes/category.php');
+    require_once(__DIR__ . '/../../course/classes/category.php');
     // Find courses in origin cat and duplicate them to destination.
     // Get list of courses.
     $courses = local_catdup_get_courses($origin);
@@ -89,7 +93,8 @@ function local_catdup_duplicate($origin, $destination, $USER, $extension, $oldex
     }
 }
 
-function local_catdup_duplicate_course($courseid, $fullname, $shortname, $categoryid, $oldextension, $extension, $visible = 1) {
+function local_catdup_duplicate_course($courseid, $fullname, $shortname, $categoryid, $oldextension, $extension, $visible = 1)
+{
     global $CFG, $DB;
     require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
     require_once($CFG->dirroot . '/backup/controller/backup_controller.class.php');
@@ -126,7 +131,7 @@ function local_catdup_duplicate_course($courseid, $fullname, $shortname, $catego
 
     // Restore.
     if (!file_exists($CFG->dataroot . '/temp/backup/' . $backupdir . "/moodle_backup.xml")) {
-        $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), $CFG->dataroot.'/temp/backup/'.$backupdir);
+        $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), $CFG->dataroot . '/temp/backup/' . $backupdir);
     }
 
     $data = new \stdClass();
@@ -162,19 +167,27 @@ function local_catdup_duplicate_course($courseid, $fullname, $shortname, $catego
 
         $controller->execute_plan();
 
-        // Rename fullname and shortname.
-        $torename = $DB->get_record('course', ['id' => $destcourse]);
-        $newfullname = preg_replace("/(\w+) copy (\d+)/", '$1', $torename->fullname);
+        $course_old = $DB->get_record('course', ['id' => $courseid]);
+        $origin_shortname = $course_old->shortname;
+        // Rename shortname.
         if ($oldextension != '') {
-            $newfullname = str_replace($oldextension, $extension, $newfullname);
-        } else {
-            $newfullname = $newfullname . $extension;
+            //Rename old course
+            $course_old->shortname = $course_old->shortname . $oldextension;
+            $DB->update_record('course', $course_old);
+
+            rebuild_course_cache($courseid);
+
         }
-        $record = new \stdClass();
-        $record->id = $destcourse;
-        $record->fullname = $newfullname;
-        $renamed = $DB->update_record('course', $record);
+
+        $new_course = $DB->get_record('course', ['id' => $destcourse]);
+        $new_course->fullname = $course_old->fullname;
+        if ($extension != "") {
+            $new_course->shortname = $origin_shortname . $extension;
+        }
+
+        $DB->update_record('course', $new_course);
         rebuild_course_cache($destcourse);
+
         $file->delete();
     }
 }

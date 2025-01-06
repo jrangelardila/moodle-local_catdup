@@ -70,6 +70,9 @@ class local_catdup_main_form extends moodleform
         if (empty($data['destination'])) {
             $errors['destination'] = get_string('selectdestination', 'local_catdup');
         }
+        if (empty($data['extension'])) {
+            $errors['extension'] = get_string('required');
+        }
         return $errors;
     }
 }
